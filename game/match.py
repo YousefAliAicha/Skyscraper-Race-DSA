@@ -1,4 +1,4 @@
-"""One match window: left text sidebar + right game board.
+"""One match window: centered text sidebar + game board.
 
 Controls:
   R / ROLL     roll a floor
@@ -365,8 +365,12 @@ def run_match():
             root.geometry("1280x900")
         root.configure(bg=BG)
 
-        # Pack canvas as a root sibling (packing into a frame blanks it)
+        # Pack canvas as a root sibling (packing into a frame blanks it).
+        # Expand spacers on both sides so sidebar + board sit in the center.
         board._canvas.pack_forget()
+
+        left_spacer = tk.Frame(root, bg=BG)
+        left_spacer.pack(side="left", fill="both", expand=True)
 
         side = tk.Frame(root, bg=PANEL, width=300, padx=20, pady=24)
         side.pack(side="left", fill="y")
@@ -388,6 +392,9 @@ def run_match():
 
         board._canvas.configure(bg=BG, highlightthickness=0)
         board._canvas.pack(side="left", padx=24, pady=24)
+
+        right_spacer = tk.Frame(root, bg=BG)
+        right_spacer.pack(side="left", fill="both", expand=True)
 
         root.update_idletasks()
         draw()
