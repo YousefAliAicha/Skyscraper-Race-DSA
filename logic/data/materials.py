@@ -1,11 +1,12 @@
-"""DATA STRUCTURE #1 — Hash table (dict).
+"""DATA STRUCTURE #1 — Hash table (Python dict).
 
-MATERIALS[(tier, group)] → material stats.
-Lookup is O(1) average — best for “given a roll, get stats.”
+Why: each roll needs material stats by (tier, group). A dict gives average O(1) lookup.
+Better than if/elif or scanning a list: one key → one row, and adding materials is one entry.
 """
 
 from logic.data.constants import TIER_RANGES, UNITS_PER_AMOUNT
 
+# Key = (tier, group). Digit 3 of the roll picks group "a" (0–4) or "b" (5–9).
 MATERIALS = {
     ("junk", "a"): {
         "name": "toothpicks",
@@ -41,10 +42,12 @@ MATERIALS = {
 
 
 def tier_for_digit(digit):
+    # O(1) dict read — same idea as MATERIALS.
     return TIER_RANGES[digit]
 
 
 def get_material(tier, material_digit):
+    # Map digit → group, then one hash-table lookup for the stats row.
     if material_digit <= 4:
         group = "a"
     else:
@@ -53,4 +56,5 @@ def get_material(tier, material_digit):
 
 
 def units_from_amount(amount):
+    # Linear scale: keeps roll decoding separate from the MATERIALS table.
     return amount * UNITS_PER_AMOUNT

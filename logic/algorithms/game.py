@@ -1,4 +1,8 @@
-"""Turn logic only — no GUI."""
+"""Turn engine only — no GUI.
+
+Why separate from game/: UI can be swapped without touching DSA code.
+Flow: roll → place/scrap → heap challenges → sequential stability → win.
+"""
 
 from logic.algorithms.challenges import run_challenges
 from logic.algorithms.player import Player
@@ -9,6 +13,7 @@ from logic.data.floor import Floor
 
 class Game:
     def __init__(self, name1="P1", name2="P2", enable_challenges=True):
+        # Two players; index 0 starts. feed{} is for the sidebar UI.
         self.players = [
             Player(name1, ROLLS_PER_TURN),
             Player(name2, ROLLS_PER_TURN),
@@ -38,6 +43,7 @@ class Game:
         return f"{self.current_player().name}'s turn — roll a floor"
 
     def _set_feed(self, headline, detail, result="OK", result_ok=True, events=None):
+        # Structured status so the UI does not parse free-text messages.
         self.feed = {
             "headline": headline,
             "detail": detail,
@@ -47,6 +53,7 @@ class Game:
         }
 
     def roll(self):
+        # O(1) decode + hash-table material lookup via full_decode.
         if self.phase == "game_over":
             raise RuntimeError("Game over")
         if self.phase != "roll":
@@ -77,6 +84,7 @@ class Game:
         return recipe
 
     def scrap_roll(self):
+        # Discard pending recipe; end turn if no rolls left.
         if self.phase != "place" or not self.current_player().pending_roll:
             raise RuntimeError("Nothing to scrap")
 
@@ -91,6 +99,7 @@ class Game:
             self.end_turn()
 
     def place_floor(self, position):
+        # Uses list insert, heap challenges, recursion+scan stability, then win.
         if self.phase != "place" or not self.current_player().pending_roll:
             raise RuntimeError("Roll first")
 
@@ -104,12 +113,14 @@ class Game:
 
         events = []
         if self.enable_challenges:
+            # ALGORITHM #2: peek/pop challenges whose height ≤ tower height.
             events, _fired = run_challenges(
                 player.tower,
                 player.challenge_heap,
             )
 
         collapsed = False
+        # ALGORITHM #1 + #3: recursive loads inside sequential weakest search.
         ratio, weakest_index = player.tower.check_stable()
         if weakest_index is not None and ratio < 1.0:
             self.last_collapse = player.tower.collapse(weakest_index)
@@ -145,6 +156,7 @@ class Game:
         return {"collapsed": collapsed, "won": False}
 
     def place_on_top(self):
+        # Convenience for demos/tests: append at len(floors).
         return self.place_floor(self.current_player().tower.floor_count())
 
     def check_win(self):
@@ -163,6 +175,7 @@ class Game:
         return False
 
     def end_turn(self):
+        # Flip 0↔1 and refresh the other player's roll budget.
         if self.phase == "game_over":
             return
         self.current_index = 1 - self.current_index

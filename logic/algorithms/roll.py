@@ -1,4 +1,8 @@
-"""Turn a 5-digit roll into a floor recipe."""
+"""Decode a 5-digit roll into a floor recipe.
+
+Why one number: easy to print, test, and replay — better than four separate
+random draws that are hard to reproduce in unit tests. Decoding is O(1).
+"""
 
 import random
 
@@ -11,10 +15,12 @@ from logic.data.materials import (
 
 
 def generate_roll():
+    # Uniform 5-digit int; full_decode turns it into material + height.
     return random.randint(ROLL_MIN, ROLL_MAX)
 
 
 def decode_roll(roll):
+    # Split digits: tier, amount, material pick, height (d4+d5, min 2).
     text = str(roll)
     if len(text) != 5:
         raise ValueError("roll must be 5 digits")
@@ -44,6 +50,7 @@ def decode_roll(roll):
 
 
 def full_decode(roll):
+    # Attach hash-table material stats so Floor(...) is ready in one step.
     parts = decode_roll(roll)
     material = get_material(parts["tier"], parts["material_digit"])
     units = units_from_amount(parts["amount"])

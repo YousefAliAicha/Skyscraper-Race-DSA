@@ -1,8 +1,8 @@
 """DATA STRUCTURE #3 — Min-heap of challenge heights.
 
-ALGORITHM #2 — heap peek / pop:
-  peek = challenge_heap[0]   (next / smallest height)
-  pop  = heappop(...)        when the tower reaches that height
+ALGORITHM #2 — heap peek / pop for “next event by smallest height.”
+Why a heap: next challenge is always the minimum remaining height.
+Peek O(1), pop O(log n) — better than scanning an unsorted list each place (O(n)).
 """
 
 import heapq
@@ -18,6 +18,7 @@ from logic.data.constants import (
     WINDSTORM_DAMAGE,
 )
 
+# Event names + damage percents (looked up in O(1) via dict).
 EVENT_NAMES = ("earthquake", "windstorm", "drunk_driver")
 DAMAGE = {
     "earthquake": EARTHQUAKE_DAMAGE,
@@ -27,7 +28,7 @@ DAMAGE = {
 
 
 def make_challenge_heights():
-    """Pick spaced challenge heights (low → high)."""
+    # Place heights low→high with a minimum gap so events are not stacked.
     heights = []
     lowest_allowed = CHALLENGE_MIN_HEIGHT
 
@@ -43,7 +44,7 @@ def make_challenge_heights():
 
 
 def make_heap(heights=None):
-    """Build a min-heap (smallest height at the front)."""
+    # heapify is O(n) — cheaper than n inserts — and leaves min at index 0.
     if heights is None:
         heights = make_challenge_heights()
     heap = list(heights)
@@ -52,7 +53,7 @@ def make_heap(heights=None):
 
 
 def apply_event(tower, event_name):
-    """Hurt floors. Returns a short sidebar message."""
+    # Apply one disaster. Ground hit uses index 0 — no search needed.
     floors = tower.floors_from_ground()
     if not floors:
         return event_name + ": empty tower"
@@ -70,13 +71,16 @@ def apply_event(tower, event_name):
             floor.take_damage(damage)
         return f"Windstorm -{percent}% top floors"
 
-    # drunk driver hits the ground floor (index 0) — no search needed
     floors[0].take_damage(damage)
     return f"Drunk driver -{percent}% ground"
 
 
 def run_challenges(tower, challenge_heap):
-    """Peek/pop every challenge whose height <= tower height."""
+    """While tower height ≥ next heap root, pop and apply.
+
+    Why peek/pop: the heap root is the soonest challenge; after pop, the new
+    root is the next soonest — classic priority-queue extract-min loop.
+    """
     messages = []
     fired = []
 

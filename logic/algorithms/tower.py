@@ -1,9 +1,12 @@
-"""DATA STRUCTURE #2 — Python list (array) of floors.
-  index 0 = ground, last index = top
+"""DATA STRUCTURE #2 — Python list (dynamic array) of floors.
+  index 0 = ground, last index = top.
 
-ALGORITHMS:
+Why a list: place-by-slot is natural with indices; insert/pop are simple.
+Better here than a linked list: no pointer bugs, and we never need O(1) splice mid-node.
+
+ALGORITHMS in this file:
   #1 Recursion         — load_above(index)
-  #3 Sequential search — find_weakest_floor()
+  #3 Sequential search — find_weakest_floor_index()
 """
 
 from logic.data.floor import Floor  # noqa: F401
@@ -11,7 +14,7 @@ from logic.data.floor import Floor  # noqa: F401
 
 class Tower:
     def __init__(self):
-        # list of Floor objects; [0] is ground
+        # Contiguous list of Floor objects; [0] is always the ground floor.
         self.floors = []
 
     def is_empty(self):
@@ -21,32 +24,34 @@ class Tower:
         return len(self.floors)
 
     def get_height(self):
+        # O(n) sum — n is tiny (board shows ~11 floors); clearer than caching.
         total = 0.0
         for floor in self.floors:
             total += floor.height
         return total
 
     def floors_from_ground(self):
-        """Copy of the list ground → top (for UI / tests)."""
+        # Shallow copy so UI/tests can iterate without mutating the tower.
         return list(self.floors)
 
     def insert_at(self, position, new_floor):
-        """Place a floor at this index (0 = ground, len = on top)."""
+        # List.insert is O(n) shifts — fine for small n; index = place slot.
         if position < 0 or position > len(self.floors):
             raise IndexError("bad position")
         self.floors.insert(position, new_floor)
 
     def remove_at(self, index):
-        """Delete the floor at this index."""
+        # O(n) pop by index; used when tests delete a single floor.
         return self.floors.pop(index)
 
     # --- ALGORITHM #1: recursion ---
 
     def load_above(self, index):
-        """Total weight of every floor above this index.
+        """Total weight resting on floors[index].
 
-        load_above(i) = weight(i+1) + load_above(i+1)
-        base case: top floor → 0
+        Why recursion: load(i) is defined as weight(i+1) + load(i+1); base = top → 0.
+        O(n) time / O(n) stack — matches the lower bound (must see each floor above).
+        Better than search/sort here: those do not sum a chain.
         """
         if index >= len(self.floors) - 1:
             return 0.0
@@ -56,7 +61,7 @@ class Tower:
         return next_floor.get_weight() + self.load_above(next_index)
 
     def hold_ratio(self, index):
-        """max_load / load. Under 1.0 means this floor breaks."""
+        # capacity / load. Under 1.0 means this floor fails.
         load = self.load_above(index)
         if load == 0:
             return 999.0
@@ -65,9 +70,11 @@ class Tower:
     # --- ALGORITHM #3: sequential search ---
 
     def find_weakest_floor_index(self):
-        """Scan every floor; return index with the worst hold_ratio.
+        """Return the index with the worst hold_ratio.
 
-        Sequential search: check items one by one, remember the worst.
+        Why sequential search: any floor can be weakest; no sorted key to binary-search.
+        Walk once, keep the minimum ratio — O(n) calls to hold_ratio (simple and correct).
+        Better than sorting first: we only need the min, not a full order.
         """
         if self.is_empty():
             return None
@@ -86,7 +93,7 @@ class Tower:
         return weakest_index
 
     def check_stable(self):
-        """Return (ratio, weakest_index). ratio < 1.0 → collapse."""
+        # Thin wrapper: ratio + index for the place/collapse flow.
         if self.is_empty():
             return 999.0, None
 
@@ -94,9 +101,10 @@ class Tower:
         return self.hold_ratio(weakest_index), weakest_index
 
     def collapse(self, broken_index=None):
-        """Remove the broken floor and every floor above it.
+        """Drop the broken floor and everything above it.
 
-        List slice: keep floors[0:broken_index], drop the rest.
+        Why a slice: in a list, “this index and above” is floors[i:], O(k) copy.
+        Simpler than a stack story; still removes top-down correctly.
         """
         if broken_index is None:
             ratio, broken_index = self.check_stable()
@@ -113,7 +121,7 @@ class Tower:
         for floor in fallen:
             meters_lost += floor.height
 
-        # if another floor is now overloaded, collapse again
+        # Cascade: after a cut, another floor may now be overloaded.
         ratio, weakest_index = self.check_stable()
         if weakest_index is not None and ratio < 1.0:
             more_fallen, more_meters = self.collapse(weakest_index)
