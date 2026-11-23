@@ -16,10 +16,16 @@ class Player:
         self.rolls_per_turn = rolls_per_turn
         self.rolls_left = rolls_per_turn
         self.pending_roll = None
+        self.won = False
+
         # Keep the raw list for debugging; heap is what gameplay uses.
         self.challenge_heights = make_challenge_heights()
-        self.challenge_heap = make_heap(list(self.challenge_heights))
-        self.won = False
+        copy_for_heap = []
+        index = 0
+        while index < len(self.challenge_heights):
+            copy_for_heap.append(self.challenge_heights[index])
+            index = index + 1
+        self.challenge_heap = make_heap(copy_for_heap)
 
     def reset_rolls(self):
         # Called at the start of this player's turn.
@@ -27,13 +33,16 @@ class Player:
         self.pending_roll = None
 
     def tower_height(self):
-        return self.tower.get_height()
+        height = self.tower.get_height()
+        return height
 
     def floor_count(self):
-        return self.tower.floor_count()
+        count = self.tower.floor_count()
+        return count
 
     def next_challenge(self):
         # ALGORITHM #2 peek: min-heap root is the next (smallest) height.
-        if self.challenge_heap:
-            return self.challenge_heap[0]
-        return None
+        if len(self.challenge_heap) == 0:
+            return None
+        next_height = self.challenge_heap[0]
+        return next_height

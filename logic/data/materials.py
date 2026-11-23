@@ -52,9 +52,13 @@ def get_material(tier, material_digit):
         group = "a"
     else:
         group = "b"
-    return MATERIALS[(tier, group)]
+
+    key = (tier, group)
+    material = MATERIALS[key]
+    return material
 
 
 def units_from_amount(amount):
     # Linear scale: keeps roll decoding separate from the MATERIALS table.
-    return amount * UNITS_PER_AMOUNT
+    units = amount * UNITS_PER_AMOUNT
+    return units

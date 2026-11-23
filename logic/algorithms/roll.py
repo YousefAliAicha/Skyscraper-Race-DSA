@@ -16,7 +16,8 @@ from logic.data.materials import (
 
 def generate_roll():
     # Uniform 5-digit int; full_decode turns it into material + height.
-    return random.randint(ROLL_MIN, ROLL_MAX)
+    roll = random.randint(ROLL_MIN, ROLL_MAX)
+    return roll
 
 
 def decode_roll(roll):
@@ -40,13 +41,14 @@ def decode_roll(roll):
     if height < 2:
         height = 2
 
-    return {
+    result = {
         "roll": roll,
         "tier": tier_for_digit(digit1),
         "amount": amount,
         "material_digit": digit3,
         "height": height,
     }
+    return result
 
 
 def full_decode(roll):
@@ -55,7 +57,7 @@ def full_decode(roll):
     material = get_material(parts["tier"], parts["material_digit"])
     units = units_from_amount(parts["amount"])
 
-    return {
+    result = {
         "roll": roll,
         "tier": parts["tier"],
         "material_name": material["name"],
@@ -65,3 +67,4 @@ def full_decode(roll):
         "height": parts["height"],
         "image": material["name"],
     }
+    return result

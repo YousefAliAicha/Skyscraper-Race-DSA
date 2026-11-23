@@ -14,10 +14,10 @@ from logic.data.floor import Floor
 class Game:
     def __init__(self, name1="P1", name2="P2", enable_challenges=True):
         # Two players; index 0 starts. feed{} is for the sidebar UI.
-        self.players = [
-            Player(name1, ROLLS_PER_TURN),
-            Player(name2, ROLLS_PER_TURN),
-        ]
+        self.players = []
+        self.players.append(Player(name1, ROLLS_PER_TURN))
+        self.players.append(Player(name2, ROLLS_PER_TURN))
+
         self.current_index = 0
         self.phase = "roll"
         self.winner = None
@@ -25,7 +25,7 @@ class Game:
         self.enable_challenges = enable_challenges
         self.message = ""
         self.feed = {
-            "headline": f"{name1}'s turn",
+            "headline": name1 + "'s turn",
             "detail": "Press R or click ROLL",
             "result": "Waiting",
             "result_ok": True,
@@ -34,22 +34,30 @@ class Game:
         self.message = self._prompt_roll()
 
     def current_player(self):
-        return self.players[self.current_index]
+        player = self.players[self.current_index]
+        return player
 
     def side_hint(self):
-        return "LEFT" if self.current_index == 0 else "RIGHT"
+        if self.current_index == 0:
+            return "LEFT"
+        return "RIGHT"
 
     def _prompt_roll(self):
-        return f"{self.current_player().name}'s turn — roll a floor"
+        player = self.current_player()
+        text = player.name + "'s turn — roll a floor"
+        return text
 
     def _set_feed(self, headline, detail, result="OK", result_ok=True, events=None):
         # Structured status so the UI does not parse free-text messages.
+        if events is None:
+            events = []
+
         self.feed = {
             "headline": headline,
             "detail": detail,
             "result": result,
             "result_ok": result_ok,
-            "events": events or [],
+            "events": events,
         }
 
     def roll(self):
@@ -65,30 +73,38 @@ class Game:
 
         recipe = full_decode(generate_roll())
         player.pending_roll = recipe
-        player.rolls_left -= 1
+        player.rolls_left = player.rolls_left - 1
         self.phase = "place"
 
-        tips = {
-            "junk": "Weak — put on top or scrap",
-            "strong": "Strong — good at the bottom",
-            "common": "Move the arrow, then press Enter",
-        }
-        tip = tips[recipe["tier"]]
+        if recipe["tier"] == "junk":
+            tip = "Weak — put on top or scrap"
+        elif recipe["tier"] == "strong":
+            tip = "Strong — good at the bottom"
+        else:
+            tip = "Move the arrow, then press Enter"
 
-        self.message = f"Rolled {recipe['material_name']} {recipe['height']}m"
+        self.message = (
+            "Rolled "
+            + recipe["material_name"]
+            + " "
+            + str(recipe["height"])
+            + "m"
+        )
         self._set_feed(
-            f"Rolled {recipe['material_name']}",
-            f"{recipe['height']} m — {tip}",
+            "Rolled " + recipe["material_name"],
+            str(recipe["height"]) + " m — " + tip,
             "Choose a height",
         )
         return recipe
 
     def scrap_roll(self):
         # Discard pending recipe; end turn if no rolls left.
-        if self.phase != "place" or not self.current_player().pending_roll:
+        player = self.current_player()
+        if self.phase != "place":
+            raise RuntimeError("Nothing to scrap")
+        if player.pending_roll is None:
             raise RuntimeError("Nothing to scrap")
 
-        player = self.current_player()
         player.pending_roll = None
         self._set_feed("Scrapped", "That roll was discarded", "OK")
 
@@ -100,19 +116,26 @@ class Game:
 
     def place_floor(self, position):
         # Uses list insert, heap challenges, recursion+scan stability, then win.
-        if self.phase != "place" or not self.current_player().pending_roll:
+        player = self.current_player()
+        if self.phase != "place":
+            raise RuntimeError("Roll first")
+        if player.pending_roll is None:
             raise RuntimeError("Roll first")
 
-        player = self.current_player()
         recipe = player.pending_roll
-        slot = max(0, min(position, player.tower.floor_count()))
+
+        slot = position
+        if slot < 0:
+            slot = 0
+        if slot > player.tower.floor_count():
+            slot = player.tower.floor_count()
 
         player.tower.insert_at(slot, Floor(recipe))
         player.pending_roll = None
         self.last_collapse = None
 
         events = []
-        if self.enable_challenges:
+        if self.enable_challenges is True:
             # ALGORITHM #2: peek/pop challenges whose height ≤ tower height.
             events, _fired = run_challenges(
                 player.tower,
@@ -122,42 +145,62 @@ class Game:
         collapsed = False
         # ALGORITHM #1 + #3: recursive loads inside sequential weakest search.
         ratio, weakest_index = player.tower.check_stable()
-        if weakest_index is not None and ratio < 1.0:
-            self.last_collapse = player.tower.collapse(weakest_index)
-            collapsed = True
+        if weakest_index is not None:
+            if ratio < 1.0:
+                self.last_collapse = player.tower.collapse(weakest_index)
+                collapsed = True
 
         height = player.tower_height()
-        if collapsed:
+        if collapsed is True:
             fallen_floors, meters_lost = self.last_collapse
             self._set_feed(
-                f"Placed {recipe['material_name']} ({recipe['height']} m)",
-                f"Slot {slot} → tower {height:.0f} m",
-                f"Collapsed — lost {len(fallen_floors)} floors ({meters_lost:.0f} m)",
-                result_ok=False,
-                events=events,
+                "Placed "
+                + recipe["material_name"]
+                + " ("
+                + str(recipe["height"])
+                + " m)",
+                "Slot " + str(slot) + " → tower " + str(int(height)) + " m",
+                "Collapsed — lost "
+                + str(len(fallen_floors))
+                + " floors ("
+                + str(int(meters_lost))
+                + " m)",
+                False,
+                events,
             )
-            self.message = f"Collapse! {height:.0f} m left"
+            self.message = "Collapse! " + str(int(height)) + " m left"
         else:
             self._set_feed(
-                f"Placed {recipe['material_name']} ({recipe['height']} m)",
-                f"Slot {slot} → tower {height:.0f} m",
+                "Placed "
+                + recipe["material_name"]
+                + " ("
+                + str(recipe["height"])
+                + " m)",
+                "Slot " + str(slot) + " → tower " + str(int(height)) + " m",
                 "Stable",
-                events=events,
+                True,
+                events,
             )
-            self.message = f"Placed — {height:.0f} m"
+            self.message = "Placed — " + str(int(height)) + " m"
 
-        if self.check_win():
-            return {"collapsed": collapsed, "won": True}
+        if self.check_win() is True:
+            result = {"collapsed": collapsed, "won": True}
+            return result
 
         if player.rolls_left > 0:
             self.phase = "roll"
         else:
             self.end_turn()
-        return {"collapsed": collapsed, "won": False}
+
+        result = {"collapsed": collapsed, "won": False}
+        return result
 
     def place_on_top(self):
         # Convenience for demos/tests: append at len(floors).
-        return self.place_floor(self.current_player().tower.floor_count())
+        player = self.current_player()
+        top_slot = player.tower.floor_count()
+        result = self.place_floor(top_slot)
+        return result
 
     def check_win(self):
         player = self.current_player()
@@ -165,10 +208,10 @@ class Game:
             self.winner = player
             self.phase = "game_over"
             player.won = True
-            self.message = f"{player.name} wins!"
+            self.message = player.name + " wins!"
             self._set_feed(
-                f"{player.name} wins",
-                f"Reached {player.tower_height():.0f} m",
+                player.name + " wins",
+                "Reached " + str(int(player.tower_height())) + " m",
                 "Victory",
             )
             return True
@@ -178,13 +221,18 @@ class Game:
         # Flip 0↔1 and refresh the other player's roll budget.
         if self.phase == "game_over":
             return
-        self.current_index = 1 - self.current_index
+
+        if self.current_index == 0:
+            self.current_index = 1
+        else:
+            self.current_index = 0
+
         player = self.current_player()
         player.reset_rolls()
         self.phase = "roll"
         self.message = self._prompt_roll()
         self._set_feed(
-            f"{player.name}'s turn",
-            f"Build on the {self.side_hint()} side",
-            f"{player.rolls_left} rolls ready",
+            player.name + "'s turn",
+            "Build on the " + self.side_hint() + " side",
+            str(player.rolls_left) + " rolls ready",
         )

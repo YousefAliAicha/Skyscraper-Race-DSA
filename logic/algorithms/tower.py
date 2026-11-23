@@ -18,31 +18,45 @@ class Tower:
         self.floors = []
 
     def is_empty(self):
-        return len(self.floors) == 0
+        if len(self.floors) == 0:
+            return True
+        return False
 
     def floor_count(self):
-        return len(self.floors)
+        count = len(self.floors)
+        return count
 
     def get_height(self):
         # O(n) sum — n is tiny (board shows ~11 floors); clearer than caching.
         total = 0.0
-        for floor in self.floors:
-            total += floor.height
+        index = 0
+        while index < len(self.floors):
+            floor = self.floors[index]
+            total = total + floor.height
+            index = index + 1
         return total
 
     def floors_from_ground(self):
-        # Shallow copy so UI/tests can iterate without mutating the tower.
-        return list(self.floors)
+        # Copy so UI/tests can iterate without mutating the tower.
+        result = []
+        index = 0
+        while index < len(self.floors):
+            result.append(self.floors[index])
+            index = index + 1
+        return result
 
     def insert_at(self, position, new_floor):
         # List.insert is O(n) shifts — fine for small n; index = place slot.
-        if position < 0 or position > len(self.floors):
+        if position < 0:
+            raise IndexError("bad position")
+        if position > len(self.floors):
             raise IndexError("bad position")
         self.floors.insert(position, new_floor)
 
     def remove_at(self, index):
         # O(n) pop by index; used when tests delete a single floor.
-        return self.floors.pop(index)
+        removed = self.floors.pop(index)
+        return removed
 
     # --- ALGORITHM #1: recursion ---
 
@@ -53,19 +67,27 @@ class Tower:
         O(n) time / O(n) stack — matches the lower bound (must see each floor above).
         Better than search/sort here: those do not sum a chain.
         """
+        # Base case: this is the top floor (nothing above it).
         if index >= len(self.floors) - 1:
             return 0.0
 
         next_index = index + 1
         next_floor = self.floors[next_index]
-        return next_floor.get_weight() + self.load_above(next_index)
+        weight_of_next = next_floor.get_weight()
+        weight_above_next = self.load_above(next_index)
+        total = weight_of_next + weight_above_next
+        return total
 
     def hold_ratio(self, index):
         # capacity / load. Under 1.0 means this floor fails.
         load = self.load_above(index)
         if load == 0:
             return 999.0
-        return self.floors[index].get_max_load() / load
+
+        floor = self.floors[index]
+        max_load = floor.get_max_load()
+        ratio = max_load / load
+        return ratio
 
     # --- ALGORITHM #3: sequential search ---
 
@@ -76,29 +98,32 @@ class Tower:
         Walk once, keep the minimum ratio — O(n) calls to hold_ratio (simple and correct).
         Better than sorting first: we only need the min, not a full order.
         """
-        if self.is_empty():
+        if self.is_empty() is True:
             return None
 
+        # Start by assuming floor 0 is the weakest.
         weakest_index = 0
         worst_ratio = self.hold_ratio(0)
 
+        # Check every other floor one by one.
         index = 1
         while index < len(self.floors):
             ratio = self.hold_ratio(index)
             if ratio < worst_ratio:
                 worst_ratio = ratio
                 weakest_index = index
-            index += 1
+            index = index + 1
 
         return weakest_index
 
     def check_stable(self):
         # Thin wrapper: ratio + index for the place/collapse flow.
-        if self.is_empty():
+        if self.is_empty() is True:
             return 999.0, None
 
         weakest_index = self.find_weakest_floor_index()
-        return self.hold_ratio(weakest_index), weakest_index
+        ratio = self.hold_ratio(weakest_index)
+        return ratio, weakest_index
 
     def collapse(self, broken_index=None):
         """Drop the broken floor and everything above it.
@@ -108,24 +133,45 @@ class Tower:
         """
         if broken_index is None:
             ratio, broken_index = self.check_stable()
-            if broken_index is None or ratio >= 1.0:
+            if broken_index is None:
+                return [], 0.0
+            if ratio >= 1.0:
                 return [], 0.0
 
-        if broken_index < 0 or broken_index >= len(self.floors):
+        if broken_index < 0:
+            return [], 0.0
+        if broken_index >= len(self.floors):
             return [], 0.0
 
-        fallen = self.floors[broken_index:]
-        self.floors = self.floors[:broken_index]
+        # Keep everything below the break; drop the rest.
+        fallen = []
+        index = broken_index
+        while index < len(self.floors):
+            fallen.append(self.floors[index])
+            index = index + 1
+
+        kept = []
+        index = 0
+        while index < broken_index:
+            kept.append(self.floors[index])
+            index = index + 1
+        self.floors = kept
 
         meters_lost = 0.0
-        for floor in fallen:
-            meters_lost += floor.height
+        index = 0
+        while index < len(fallen):
+            meters_lost = meters_lost + fallen[index].height
+            index = index + 1
 
         # Cascade: after a cut, another floor may now be overloaded.
         ratio, weakest_index = self.check_stable()
-        if weakest_index is not None and ratio < 1.0:
-            more_fallen, more_meters = self.collapse(weakest_index)
-            fallen.extend(more_fallen)
-            meters_lost += more_meters
+        if weakest_index is not None:
+            if ratio < 1.0:
+                more_fallen, more_meters = self.collapse(weakest_index)
+                index = 0
+                while index < len(more_fallen):
+                    fallen.append(more_fallen[index])
+                    index = index + 1
+                meters_lost = meters_lost + more_meters
 
         return fallen, meters_lost
